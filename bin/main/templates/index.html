@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Spring Boot Website</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">My Website</h1>
+            <ul class="nav-links">
+                <li><a href="/">ホーム</a></li>
+                <li><a href="/about">概要</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1 th:text="${message}">Welcome!</h1>
+        <p>Spring Boot でウェブサイトを構築しています。</p>
+        <p>このサイトは Thymeleaf テンプレートエンジンを使用しています。</p>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 My Spring Boot Website. All rights reserved.</p>
+    </footer>
+</body>
+</html>
