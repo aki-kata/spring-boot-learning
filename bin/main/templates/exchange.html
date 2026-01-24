@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">為替レート情報</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        .exchange-container {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .currency-selector {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            align-items: center;
+        }
+        .currency-selector input {
+            padding: 8px 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            width: 150px;
+        }
+        .currency-selector input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 30px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .error-message {
+            padding: 15px;
+            background-color: #ffe0e0;
+            border-left: 4px solid #f44336;
+            border-radius: 5px;
+            color: #c62828;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">My Website</h1>
+            <ul class="nav-links">
+                <li><a href="/">ホーム</a></li>
+                <li><a href="/about">概要</a></li>
+                <li><a href="/exchange">為替レート</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1 th:text="${title}">為替レート情報</h1>
+        
+        <div class="exchange-container">
+            <h2>📊 通貨別レート推移</h2>
+            <p>通貨コード（USD、EUR、AUD、NZD）を入力して、過去5日間のレート推移をグラフで表示します。</p>
+            
+            <div class="currency-selector">
+                <label for="currencyInput">基準通貨コード:</label>
+                <input type="text" id="currencyInput" placeholder="例: USD, EUR, AUD, NZD" value="USD" maxlength="3" />
+            </div>
+            
+            <div id="loadingMessage" class="loading" style="display: none;">読込中...</div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            
+            <div class="chart-container">
+                <canvas id="rateChart"></canvas>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; padding: 15px; background-color: #e8f5e9; border-radius: 5px;">
+            <h3>📝 このページについて</h3>
+            <p>このページは <strong>外部APIからの為替レート取得</strong> を実装しています。</p>
+            <p>通貨コードを入力してフォーカスを外すと、自動的にAPIが呼ばれて過去5日間のレート推移が表示されます。</p>
+            <p>表示される通貨：米ドル（USD）、ユーロ（EUR）、豪ドル（AUD）、ニュージーランドドル（NZD）</p>
+        </div>
+
+        <hr style="margin: 30px 0;">
+
+        <div style="text-align: center; color: #666;">
+            <p>最終更新: 2026年1月18日</p>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 My Spring Boot Website. All rights reserved.</p>
+    </footer>
+
+    <script>
+        let chartInstance = null;
+
+        // テキストボックスのフォーカスアウトイベント
+        document.getElementById('currencyInput').addEventListener('blur', function() {
+            const baseCurrency = this.value.toUpperCase().trim();
+            
+            if (!baseCurrency) {
+                showError('通貨コードを入力してください。');
+                return;
+            }
+            
+            fetchExchangeRateHistory(baseCurrency);
+        });
+
+        // APIから過去5日間のレート情報を取得
+        async function fetchExchangeRateHistory(baseCurrency) {
+            const loadingMsg = document.getElementById('loadingMessage');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            loadingMsg.style.display = 'block';
+            errorMsg.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/exchange-history?base=${baseCurrency}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    drawChart(data.data, baseCurrency);
+                } else {
+                    showError(data.message || 'データ取得に失敗しました。');
+                }
+            } catch (error) {
+                showError(`エラー: ${error.message}`);
+            } finally {
+                loadingMsg.style.display = 'none';
+            }
+        }
+
+        // グラフを描画
+        function drawChart(data, baseCurrency) {
+            const ctx = document.getElementById('rateChart').getContext('2d');
+            
+            // 既存のグラフを破棄
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            // データセット（USD、EUR、AUD、NZD）
+            const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'];
+            const datasets = [];
+            
+            Object.keys(data).forEach((currency, index) => {
+                datasets.push({
+                    label: `${currency}`,
+                    data: data[currency],
+                    borderColor: colors[index],
+                    backgroundColor: colors[index] + '20',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                });
+            });
+            
+            // グラフの日付ラベルを生成（過去5日）
+            const labels = [];
+            for (let i = 4; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }));
+            }
+            
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `基準通貨: ${baseCurrency} に対するレート推移（過去5日間）`,
+                            font: { size: 14, weight: 'bold' }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: `レート（${baseCurrency}基準）`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // エラーメッセージ表示
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+
+        // ページ読込時に初期グラフを表示
+        window.addEventListener('load', function() {
+            fetchExchangeRateHistory('USD');
+        });
+    </script>
+</body>
+</html>
